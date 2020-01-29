@@ -15,12 +15,17 @@ module AjaxfulRating # :nodoc:
     #
     # Example:
     #   class Article < ActiveRecord::Base
-    #     ajaxful_rateable :stars => 10, :cache_column => :custom_column
+    #     ajaxful_rateable stars: 10, cache_column: :custom_column
     #   end
     def ajaxful_rateable(options = {})
       options[:class_name] ||= 'Rate'
-      has_many :rates_without_dimension, :as => :rateable, :class_name => options[:class_name], :dependent => :destroy, :conditions => {:dimension => nil}
-      has_many :raters_without_dimension, :through => :rates_without_dimension, :source => :rater
+      has_many :rates_without_dimension, -> { where( ["dimension = ?", nil]) },
+               as: :rateable, 
+               class_name: options[:class_name], 
+               dependent: :destroy
+      has_many :raters_without_dimension, 
+               through: :rates_without_dimension, 
+               source: :rater
 
       class << self
         def axr_config(dimension = nil)
@@ -28,9 +33,9 @@ module AjaxfulRating # :nodoc:
           @axr_config ||= {}
           dimension = dimension.to_sym
           @axr_config[dimension] ||= {
-            :stars => 5,
-            :allow_update => true,
-            :cache_column => :rating_average
+            stars: 5,
+            allow_update: true,
+            cache_column: :rating_average
           }
         end
         
@@ -39,9 +44,13 @@ module AjaxfulRating # :nodoc:
 
       if options[:dimensions].is_a?(Array)
         options[:dimensions].each do |dimension|
-          has_many "#{dimension}_rates", :dependent => :destroy,
-            :conditions => {:dimension => dimension.to_s}, :class_name => 'Rate', :as => :rateable
-          has_many "#{dimension}_raters", :through => "#{dimension}_rates", :source => :rater
+          has_many "#{dimension}_rates", -> { where(["dimension = ?", dimension.to_s]) }
+                    dependent: :destroy,
+                    class_name: 'Rate', 
+                    as: :rateable
+          has_many "#{dimension}_raters", 
+                   through: "#{dimension}_rates",
+                   source: :rater
 
           axr_config(dimension).update(options)
         end 
@@ -56,7 +65,7 @@ module AjaxfulRating # :nodoc:
 
     # Makes the association between user and Rate model.
     def ajaxful_rater(options = {})
-      has_many :ratings_given, options.merge(:class_name => "Rate", :foreign_key => :rater_id)
+      has_many :ratings_given, options.merge(class_name: "Rate", foreign_key: :rater_id)
     end
   end
 
@@ -118,9 +127,9 @@ module AjaxfulRating # :nodoc:
         "INNER JOIN rates r ON u.id = r.rater_id WHERE "
       
       sql << self.class.send(:sanitize_sql_for_conditions, {
-        :rateable_id => id,
-        :rateable_type => self.class.base_class.name,
-        :dimension => (dimension.to_s if dimension)
+        rateable_id: id,
+        rateable_type: self.class.base_class.name,
+        dimension: (dimension.to_s if dimension)
       }, 'r')
       
       self.class.user_class.find_by_sql(sql)
@@ -196,7 +205,7 @@ module AjaxfulRating # :nodoc:
     #
     # Change it by passing the :stars option to +ajaxful_rateable+
     #
-    #   ajaxful_rateable :stars => 10
+    #   ajaxful_rateable stars: 10
     def max_stars(dimension = nil)
       axr_config(dimension)[:stars]
     end
@@ -237,9 +246,9 @@ module AjaxfulRating # :nodoc:
         "#{self.base_class.table_name} r2 ON r1.rateable_id = r2.id WHERE "
       
       sql << sanitize_sql_for_conditions({
-        :rateable_type => self.base_class.name,
-        attr_name => attr_value,
-        :dimension => (dimension.to_s if dimension)
+        rateable_type: self.base_class.name,
+        attr_name: attr_value,
+        dimension: (dimension.to_s if dimension)
       }, 'r1')
       
       find_by_sql(sql)
@@ -250,11 +259,11 @@ module AjaxfulRating # :nodoc:
     # Include a column named +rating_average+ in your rateable model with
     # default null, as decimal:
     #
-    #   t.decimal :rating_average, :precision => 3, :scale => 1, :default => 0
+    #   t.decimal :rating_average, precision: 3, scale: 1, default: 0
     #
     # To customize the name of the column specify the option <tt>:cache_column</tt> to ajaxful_rateable
     #
-    #   ajaxful_rateable :cache_column => :my_custom_column
+    #   ajaxful_rateable cache_column: :my_custom_column
     #
     def caching_average?(dimension = nil)
       column_names.include?(caching_column_name(dimension))
